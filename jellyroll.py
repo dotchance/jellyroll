@@ -48,7 +48,8 @@ def getZoneDataAsDict(ws):
         return
  
     print('Zone list recieved.')
-    return zoneDataDict
+    return zoneDataDict.get('zones').keys()
+
 
 def getPatternDataAsDict(ws):
     print('Getting pattern list from controller..')
@@ -62,8 +63,14 @@ def getPatternDataAsDict(ws):
     print('Pattern list recieved.')
     return patternDataDict
 
-def setZoneOnOff(ws, zone, patternName, command):
-    pass
+def setZoneOnOff(ws, zoneName, patternName, zoneOnOff):
+    print('Turning zone %s %s' % (zoneName, zoneOnOff))
+    cmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":%s,"zoneName":["%s"]}}' % (patternName, zoneOnOff, zoneName)
+    print(cmd)
+    ws.send(cmd)
+    result = ws.recv()
+    print(result)
+    return result
 
 def setZoneBrightness(ws, zone):
     pass
@@ -75,22 +82,44 @@ def setZonePattern(ws, zone, patternName):
 def main(args): 
     controllerURL   = 'ws://%s:%s/ws/' % (args.controllerIP, args.controllerPort)
     headers         = {'user-agent': '%s (%s)' % (appName, appVersion)}
-    websocket.enableTrace(args.verbose)
-
+    #websocket.enableTrace(args.verbose)
     ws = openWS(controllerURL, headers)
-    zoneDataDict = getZoneDataAsDict(ws)
-    patternDataDict = getPatternDataAsDict(ws)
+
+    if "getZones" in sys.argv:
+        print("Found getZones in arguments - attempting to get list of Zones")
+        print(getZoneDataAsDict(ws))
+        
+    elif "getPatterns" in sys.argv:
+        print("Found getPatterns in arguments - attempting to get list of Patterns")
+        print(getPatternDataAsDict(ws))
+    
+    elif "setZone" in sys.argv:
+        print("Found setZone in arguments - attempting to control a zone.")
+        zoneName    = args.zoneName
+        patternName = args.patternName
+        zoneOnOff   = args.zoneOnOff
+        setZoneOnOff(ws, zoneName, patternName, zoneOnOff)
+    
+    else:
+        print("NO COMMANDS FOUND - CLOSING CONNECTION")
+    
     closeWS(ws, controllerURL)
     sys.exit(0)
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description='jellyroll.py: Send commands to JellyFish Lighting controller')
     parser.add_argument('-c', '--controllerIP', type=str, required=True, help='hostname or IP address of JellyFish controller')
     parser.add_argument('-p', '--controllerPort', type=str, required=False, default='9000', help='port number that controller is listening on. Typically 9000')
-    parser.add_argument('-z', '--zoneName', type=str, required=False, help='Name of Zone to control')
-    parser.add_argument('-o', '--zoneOnOff', type=bool, required=False, help='turn Zone on or off - BOOLEAN')
     parser.add_argument('-v', '--verbose', type=bool, required=False, default=False, help='enable verbose logging')
+
+    subparsers = parser.add_subparsers(title='COMMANDS', description='List of sub commands that can be run - each has thier own required options')
+    parser_setZone = subparsers.add_parser('setZone')
+    parser_setZone.add_argument('-z', '--zoneName', type=str, required=True, default=argparse.SUPPRESS, help='Name of Zone to control')
+    parser_setZone.add_argument('-o', '--zoneOnOff', type=str, required=False, default=argparse.SUPPRESS, help='turn Zone on (1) or off (0)')
+    parser_setZone.add_argument('-t', '--patternName', type=str, required=False, default='Warm Cool/White', help='name of the pattern that you want to apply format: Folder/Pattern Name') 
+    
+    parser_getZone = subparsers.add_parser('getZones')
+    parser_getPatterns = subparsers.add_parser('getPatterns')
 
     try:
         sys.exit(main(parser.parse_args()))
