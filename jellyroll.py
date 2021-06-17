@@ -4,8 +4,6 @@
 # Author: first . last @ gmail
 # GitHub: @dotchance
 
-
-from typing import Pattern
 import websocket, json, argparse
 import sys
 #import os, time, logging
@@ -73,6 +71,18 @@ def jsonToListPatternFoldersAndNames(jsonObject):
 
     return dataArray
 
+def testfunc(ws, keys):
+    
+    patternData = json.loads(wsSendCommand(ws, getPatternFileList))
+
+    dataArray = []
+    for value in patternData["patternFileList"]:
+        string = ''
+        for key in keys:
+            string += value[key]+'/'
+        dataArray.append(string.replace('//','/'))
+    return dataArray
+
 def getZoneNames(ws):
     print('Getting zone list from controller..' , end = '')
     zoneData = json.loads(wsSendCommand(ws, getAllZones))
@@ -132,7 +142,10 @@ def main(args):
         print("Found getPatterns in arguments - attempting to get list of Patterns")
         ws = wsOpen(controllerURL, headers)
         patternFileList = getPatternData(ws)
-        
+        #keys = ['name', 'readOnly']
+        #patternFileList = testfunc(ws, keys)
+        print(patternFileList)
+
     elif "setZone" in sys.argv:
         print("Found setZone in arguments - attempting to control a zone.")
         ws = wsOpen(controllerURL, headers)
