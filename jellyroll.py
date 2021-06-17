@@ -12,7 +12,7 @@ import sys
 # CONSTANTS 
 #
 appName         = 'jellyroll'
-appVersion      = 20210614.01
+appVersion      = 20210617.01
 
 # EXAMPLES FROM API DOCS
 #getPatternFileData = '{"cmd":"toCtlrGet", "get":[["patternFileData", "Legacy", "Red Yellow Green Blue"]]}'
@@ -22,7 +22,7 @@ appVersion      = 20210614.01
 zoneBrightnessLevel = ''
 
 def wsOpen(controllerURL, headers):
-    print('Attempting connection to: %s........' % controllerURL, end = '')  
+    #print('Attempting connection to: %s........' % controllerURL, end = '')  
     #websocket.enableTrace(args.verbose)
         
     try:
@@ -31,12 +31,12 @@ def wsOpen(controllerURL, headers):
         print('FAILURE: Failed to open connection to controller: %s' % controllerURL)
         print(e)
         sys.exit(1)
-    print('connection esablished.')
+    #print('connection esablished.')
     
     return ws
 
 def wsClose(ws, controllerURL):
-    print('Closing connection to: %s' % controllerURL)
+    #print('Closing connection to: %s' % controllerURL)
     try:
         ws.close()
     except Exception as e:
@@ -72,15 +72,18 @@ def jsonToListPatternFoldersAndNames(jsonObject):
 
 def testfunc(ws, keys):
     
+    getPatternFileList = '{"cmd": "toCtlrGet", "get": [["patternFileList"]]}'
+
     patternData = json.loads(wsSendCommand(ws, getPatternFileList))
 
     dataArray = []
     for value in patternData["patternFileList"]:
         string = ''
         for key in keys:
-            string += value[key]+'/'
+            string += str(value[key])+'/'
         dataArray.append(string.replace('//','/'))
     return dataArray
+
 
 def addZone(ws, zoneName):
     pass
@@ -99,7 +102,7 @@ def getZoneNames(ws):
     return
 
 def getPatternNames(ws):
-    print('Getting pattern list from controller.....')
+    #print('Getting pattern list from controller.....')
 
     getPatternFileList = '{"cmd": "toCtlrGet", "get": [["patternFileList"]]}'
 
@@ -112,20 +115,35 @@ def getPatternNames(ws):
     patternFileList = jsonToListPatternFoldersAndNames(patternData)
     patternFileList.sort()
 
-    for pattern in patternFileList:
-        print(pattern)
+    #for pattern in patternFileList:
+    #    print(pattern)
 
     return patternFileList
 
 def getPatternFileData(ws, patternFileName):
-    print('Getting data for pattern %s ' % (patternFileName))
+    #print('Getting data for pattern %s ' % (patternFileName))
 
     patternFolder,patternName = patternFileName.split('/')
 
     getPatternFileCmd = '{"cmd":"toCtlrGet","get":[["patternFileData", "%s","%s"]] }' % (patternFolder, patternName)
     patternFileData = json.loads(wsSendCommand(ws, getPatternFileCmd))
 
+    #print("%s = %s" % (patternFileName, patternFileData))
     return patternFileData
+
+def getAllPatternFileData(ws):
+    #print('Getting data for *ALL* patterns )
+
+    patternFileList = getPatternNames(ws)
+
+    for patternFileName in patternFileList:
+        _patternFolder,_patternName = patternFileName.split('/')
+        if _patternName != '':
+            patternFileData = ''
+            patternFileData = getPatternFileData(ws, patternFileName)
+            print("%s = %s" % (patternFileName, patternFileData ))
+
+    return
 
 def setPattern(ws, patternName):
     # {"cmd":"toCtlrSet","runPattern":{"file":"","data":"{\"colors\":[255,0,0,255,255,255,0,0,255],\"spaceBetweenPixels\":10,\"effectBetweenPixels\":\"No ColorTransform\",\"type\":\"Multi-Paint\",\"skip\":1,\"numOfLeds\":6,\"runData\":{\"speed\":15,\"brightness\":100,\"effect\":\"NoEffect\",\"effectValue\":0,\"rgbAdj\":[100,100,100]},\"direction\":\"Center\"}","id":"","state":1,"zoneName":["Zone","Zone1"]}}
@@ -169,20 +187,20 @@ def main(args):
     headers         = {'user-agent': '%s (%s)' % (appName, appVersion)}
 
     if "getZoneNames" in sys.argv:
-        print("Found getZoneNames in arguments - attempting to get list of Zones")
+        #print("Found getZoneNames in arguments - attempting to get list of Zones")
         ws = wsOpen(controllerURL, headers)
         zoneNames = getZoneNames(ws)
         
     elif "getPatternNames" in sys.argv:
-        print("Found getPatterns in arguments - attempting to get list of Patterns")
+        #print("Found getPatterns in arguments - attempting to get list of Patterns")
         ws = wsOpen(controllerURL, headers)
         patternFileList = getPatternNames(ws)
-        #keys = ['name', 'readOnly']
+        #keys = ['folders', 'name']
         #patternFileList = testfunc(ws, keys)
-        #print(patternFileList)
+        print(patternFileList)
 
     elif "setZone" in sys.argv:
-        print("Found setZone in arguments - attempting to control a zone.")
+        #print("Found setZone in arguments - attempting to control a zone.")
         ws = wsOpen(controllerURL, headers)
         zoneName        = args.zoneName
         patternName     = args.patternName
@@ -190,10 +208,18 @@ def main(args):
         setZoneOnOff(ws, zoneName, zoneOnOff)
     
     elif "getPatternFileData" in sys.argv:
-        print("Found getPatternFileData in arguments - attempting get details of a pattern file.")
+        #print("Found getPatternFileData in arguments - attempting get details of a pattern file.")
         ws = wsOpen(controllerURL, headers)
         patternFileName     = args.patternName
         patternFileData     = getPatternFileData(ws, patternFileName)
+
+    elif "getAllPatternFileData" in sys.argv:
+        #print("Found getPatternFileData in arguments - attempting get details of a pattern file.")
+        ws = wsOpen(controllerURL, headers)
+        allPatternFileData     = getAllPatternFileData(ws)
+        
+
+
 
     else:
         print("NO COMMANDS FOUND - DOING NOTHING")
@@ -218,7 +244,7 @@ if __name__ == "__main__":
 
     parser_getZone = subparsers.add_parser('getZoneNames')
     parser_getPatterns = subparsers.add_parser('getPatternNames')
-    
+    parser_getAllPatternFileData = subparsers.add_parser('getAllPatternFileData')
     
 
 

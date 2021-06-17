@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+data/allPatternData
+data/patternList_Example.json
+data/patternNames
