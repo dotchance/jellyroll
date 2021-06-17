@@ -12,14 +12,12 @@ import sys
 # CONSTANTS 
 #
 appName         = 'jellyroll'
-appVersion      = 20210617.01
+appVersion      = 20210617.02
 
 # EXAMPLES FROM API DOCS
 #getPatternFileData = '{"cmd":"toCtlrGet", "get":[["patternFileData", "Legacy", "Red Yellow Green Blue"]]}'
 #setZonePattern  = '{"cmd":"toCtlrSet","runPattern":{"file":"Christmas/Christmas Tree","data":"","id":"","state":1,"zoneName":["Zone", "Zone1"]}}'
 #runPattern      = '{"cmd":"toCtlrSet","runPattern":{"file":””,"data":"{\"colors\":[<int>,<int>,<int>],\"spaceBetweenPixels\":<int>,\"effectBetweenPixels\":<effect>,\"type\":<type>,\"skip\":<int>,\"numOfLeds\":<int>,\"runData\":{\"speed\":<int>,\"brightness\":<int>,\"effect\":<effect>,\"effectValue\":<int>,\"rgbAdj\":[<int>,<int>,<int>]},\"direction\":<direction>}","id":"","state":<int>,"zoneName":[<zone>,<zone>]}}'
-
-zoneBrightnessLevel = ''
 
 def wsOpen(controllerURL, headers):
     #print('Attempting connection to: %s........' % controllerURL, end = '')  
@@ -84,7 +82,6 @@ def testfunc(ws, keys):
         dataArray.append(string.replace('//','/'))
     return dataArray
 
-
 def addZone(ws, zoneName):
     pass
 
@@ -147,11 +144,16 @@ def getAllPatternFileData(ws):
 
 def setPattern(ws, patternName):
     # {"cmd":"toCtlrSet","runPattern":{"file":"","data":"{\"colors\":[255,0,0,255,255,255,0,0,255],\"spaceBetweenPixels\":10,\"effectBetweenPixels\":\"No ColorTransform\",\"type\":\"Multi-Paint\",\"skip\":1,\"numOfLeds\":6,\"runData\":{\"speed\":15,\"brightness\":100,\"effect\":\"NoEffect\",\"effectValue\":0,\"rgbAdj\":[100,100,100]},\"direction\":\"Center\"}","id":"","state":1,"zoneName":["Zone","Zone1"]}}
+    #curPatternData = getPatternFileData(ws, patternFileName)
+    #
+    #
+    # newPaternData = swap values as appropriate
+    # wsSendCommand(ws, newPatternData)
     pass
 
 def runPattern(ws, patternName, zoneName):
-    #
-    # most likley a clone of setPattern
+    # {"cmd":"toCtlrSet","runPattern":{"file":"<folderName>/<patternName>","data":"","id":"","state":1,"zoneName":[]}}
+    # most likley a clone of setZonePattern
     #
     pass
 
@@ -178,7 +180,7 @@ def setZonePattern(ws, zoneName, patternName):
 
 def setZoneBrightness(ws, zoneName, zoneBrightnessLevel):
     zoneBrightnessCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":'',"zoneName":["%s"]}}' % (patternName, zoneName)
-    zoneBrigthnessResult = json.loads(wsSendCommand(ws, zoneBrightnessCmd))
+    zoneBrightnessResult = json.loads(wsSendCommand(ws, zoneBrightnessCmd))
 
     return zoneBrightnessResult
 
@@ -218,9 +220,6 @@ def main(args):
         ws = wsOpen(controllerURL, headers)
         allPatternFileData     = getAllPatternFileData(ws)
         
-
-
-
     else:
         print("NO COMMANDS FOUND - DOING NOTHING")
     
