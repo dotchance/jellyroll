@@ -5,6 +5,7 @@
 # GitHub: @dotchance
 
 
+from typing import Pattern
 import websocket, json, argparse
 import sys
 #import os, time, logging
@@ -17,14 +18,16 @@ appVersion      = 20210614.01
 # EXAMPLES FROM API DOCS
 getAllZones        = '{"cmd": "toCtlrGet", "get": [["zones"]]}'
 getPatternFileList = '{"cmd": "toCtlrGet", "get": [["patternFileList"]]}'
-getPatternFileData = '{"cmd":"toCtlrGet", "get":[["patternFileData", "Legacy", "Red Yellow Green Blue"]]}'
+#getPatternFileData = '{"cmd":"toCtlrGet", "get":[["patternFileData", "Legacy", "Red Yellow Green Blue"]]}'
+#setZonePattern  = '{"cmd":"toCtlrSet","runPattern":{"file":"Christmas/Christmas Tree","data":"","id":"","state":1,"zoneName":["Zone", "Zone1"]}}'
+#runPattern      = '{"cmd":"toCtlrSet","runPattern":{"file":””,"data":"{\"colors\":[<int>,<int>,<int>],\"spaceBetweenPixels\":<int>,\"effectBetweenPixels\":<effect>,\"type\":<type>,\"skip\":<int>,\"numOfLeds\":<int>,\"runData\":{\"speed\":<int>,\"brightness\":<int>,\"effect\":<effect>,\"effectValue\":<int>,\"rgbAdj\":[<int>,<int>,<int>]},\"direction\":<direction>}","id":"","state":<int>,"zoneName":[<zone>,<zone>]}}'
 
-setZonePattern  = '{"cmd":"toCtlrSet","runPattern":{"file":"Christmas/Christmas Tree","data":"","id":"","state":1,"zoneName":["Zone", "Zone1"]}}'
-runPattern      = '{"cmd":"toCtlrSet","runPattern":{"file":””,"data":"{\"colors\":[<int>,<int>,<int>],\"spaceBetweenPixels\":<int>,\"effectBetweenPixels\":<effect>,\"type\":<type>,\"skip\":<int>,\"numOfLeds\":<int>,\"runData\":{\"speed\":<int>,\"brightness\":<int>,\"effect\":<effect>,\"effectValue\":<int>,\"rgbAdj\":[<int>,<int>,<int>]},\"direction\":<direction>}","id":"","state":<int>,"zoneName":[<zone>,<zone>]}}'
+zoneBrightnessLevel = ''
 
-
-def openWS(controllerURL, headers):
-    print('Attempting connection to: %s' % controllerURL)  
+def wsOpen(controllerURL, headers):
+    print('Attempting connection to: %s........' % controllerURL, end = '')  
+    #websocket.enableTrace(args.verbose)
+        
     try:
         ws = websocket.create_connection(controllerURL, header=headers)
     except Exception as e:
@@ -32,78 +35,116 @@ def openWS(controllerURL, headers):
         print(e)
         sys.exit(1)
     print('connection esablished.')
+    
     return ws
 
-def closeWS(ws, controllerURL):
+def wsClose(ws, controllerURL):
     print('Closing connection to: %s' % controllerURL)
-    ws.close()
-
-def getZoneDataAsDict(ws):
-    print('Getting zone list from controller..')
-    ws.send(getAllZones)
     try:
-        zoneDataDict = json.loads(ws.recv())
+        ws.close()
+    except Exception as e:
+        print('Failed to close connection: %s' % (e))
+    return
+
+def wsSendCommand(ws, cmd):
+    try:
+    #    print('Sending command: %s    ....' % cmd, end = '')
+        ws.send(cmd)
+    #    print('sent')
+    except Exception as e:
+        print('Failed to send command: %s' % (e))
+        return
+
+    try:
+    #    print('Listening for response....." , end = '')
+        wsResponse = ws.recv()
+    #    print("response recieved: %s" % wsResponse)
     except Exception as e:
         print('Failed to receive: %s' % (e))
         return
- 
-    print('Zone list recieved.')
-    return zoneDataDict.get('zones').keys()
 
+    return wsResponse
 
-def getPatternDataAsDict(ws):
-    print('Getting pattern list from controller..')
-    ws.send(getPatternFileList)
-    try:
-        patternDataDict = json.loads(ws.recv())
-    except Exception as e:
-        print('Failed to receive: %s' % (e))
-        return
- 
-    print('Pattern list recieved.')
-    return patternDataDict
+def jsonToListPatternFoldersAndNames(jsonObject):
+    dataArray = []
+    for value in jsonObject["patternFileList"]:
+        dataToStore = value['folders']+'/'+value['name']
+        dataArray.append(dataToStore)
 
-def setZoneOnOff(ws, zoneName, patternName, zoneOnOff):
+    return dataArray
+
+def getZoneNames(ws):
+    print('Getting zone list from controller..' , end = '')
+    zoneData = json.loads(wsSendCommand(ws, getAllZones))
+
+    for zone in zoneData.get('zones').keys():
+        print("    {}".format(zone))
+    return
+
+def getPatternData(ws):
+    print('Getting pattern list from controller.....')
+
+    patternData = json.loads(wsSendCommand(ws, getPatternFileList))
+
+    # patternData is a dict that contains
+    #   k: cmd                v: fromCtlr
+    #   k: patternFileList    v: [{'folders': 'folderName', 'name': 'patternName', 'readOnly': False}, {'folders': 'folderName', 'name': 'patternName', 'readOnly': True}, ..., ]
+
+    patternFileList = jsonToListPatternFoldersAndNames(patternData)
+    patternFileList.sort()
+
+    for pattern in patternFileList:
+        print(pattern)
+
+    return patternFileList
+
+def setZoneOnOff(ws, zoneName, zoneOnOff):
     print('Turning zone %s %s' % (zoneName, zoneOnOff))
-    cmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":%s,"zoneName":["%s"]}}' % (patternName, zoneOnOff, zoneName)
-    print(cmd)
-    ws.send(cmd)
-    result = ws.recv()
-    print(result)
-    return result
 
-def setZoneBrightness(ws, zone):
-    pass
+    zoneOnOffCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"","data":"","id":"","state":%s,"zoneName":["%s"]}}' % (zoneOnOff, zoneName)
+    zoneOnOffResult = json.loads(wsSendCommand(ws, zoneOnOffCmd))
 
-def setZonePattern(ws, zone, patternName):
-    pass
+    return zoneOnOffResult
 
+def setZonePattern(ws, zoneName, patternName):
+
+    zonePatternCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":'',"zoneName":["%s"]}}' % (patternName, zoneName)
+    zonePatternResult = json.loads(wsSendCommand(ws, zonePatternCmd))
+
+    return zonePatternResult
+
+def setZoneBrightness(ws, zoneName, zoneBrightnessLevel):
+    zoneBrightnessCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":'',"zoneName":["%s"]}}' % (patternName, zoneName)
+    zoneBrigthnessResult = json.loads(wsSendCommand(ws, zoneBrightnessCmd))
+
+    return zoneBrightnessResult
 
 def main(args): 
     controllerURL   = 'ws://%s:%s/ws/' % (args.controllerIP, args.controllerPort)
     headers         = {'user-agent': '%s (%s)' % (appName, appVersion)}
-    #websocket.enableTrace(args.verbose)
-    ws = openWS(controllerURL, headers)
 
-    if "getZones" in sys.argv:
-        print("Found getZones in arguments - attempting to get list of Zones")
-        print(getZoneDataAsDict(ws))
+    if "getZoneNames" in sys.argv:
+        print("Found getZoneNames in arguments - attempting to get list of Zones")
+        ws = wsOpen(controllerURL, headers)
+        zoneNames = getZoneNames(ws)
         
     elif "getPatterns" in sys.argv:
         print("Found getPatterns in arguments - attempting to get list of Patterns")
-        print(getPatternDataAsDict(ws))
-    
+        ws = wsOpen(controllerURL, headers)
+        patternFileList = getPatternData(ws)
+        
     elif "setZone" in sys.argv:
         print("Found setZone in arguments - attempting to control a zone.")
-        zoneName    = args.zoneName
-        patternName = args.patternName
-        zoneOnOff   = args.zoneOnOff
-        setZoneOnOff(ws, zoneName, patternName, zoneOnOff)
+        ws = wsOpen(controllerURL, headers)
+        zoneName        = args.zoneName
+        patternName     = args.patternName
+        zoneOnOff       = args.zoneOnOff
+        setZoneOnOff(ws, zoneName, zoneOnOff)
     
     else:
-        print("NO COMMANDS FOUND - CLOSING CONNECTION")
+        print("NO COMMANDS FOUND - DOING NOTHING")
     
-    closeWS(ws, controllerURL)
+    wsClose(ws, controllerURL)
     sys.exit(0)
 
 if __name__ == "__main__":
@@ -118,7 +159,7 @@ if __name__ == "__main__":
     parser_setZone.add_argument('-o', '--zoneOnOff', type=str, required=False, default=argparse.SUPPRESS, help='turn Zone on (1) or off (0)')
     parser_setZone.add_argument('-t', '--patternName', type=str, required=False, default='Warm Cool/White', help='name of the pattern that you want to apply format: Folder/Pattern Name') 
     
-    parser_getZone = subparsers.add_parser('getZones')
+    parser_getZone = subparsers.add_parser('getZoneNames')
     parser_getPatterns = subparsers.add_parser('getPatterns')
 
     try:
