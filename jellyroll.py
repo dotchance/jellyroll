@@ -20,9 +20,8 @@ appVersion      = 20210617.02
 #runPattern      = '{"cmd":"toCtlrSet","runPattern":{"file":””,"data":"{\"colors\":[<int>,<int>,<int>],\"spaceBetweenPixels\":<int>,\"effectBetweenPixels\":<effect>,\"type\":<type>,\"skip\":<int>,\"numOfLeds\":<int>,\"runData\":{\"speed\":<int>,\"brightness\":<int>,\"effect\":<effect>,\"effectValue\":<int>,\"rgbAdj\":[<int>,<int>,<int>]},\"direction\":<direction>}","id":"","state":<int>,"zoneName":[<zone>,<zone>]}}'
 
 def wsOpen(controllerURL, headers):
-    #print('Attempting connection to: %s........' % controllerURL, end = '')  
-    #websocket.enableTrace(args.verbose)
-        
+    #print('Attempting connection to: %s........' % controllerURL, end = '')
+    websocket.enableTrace(False)
     try:
         ws = websocket.create_connection(controllerURL, header=headers)
     except Exception as e:
@@ -43,17 +42,17 @@ def wsClose(ws, controllerURL):
 
 def wsSendCommand(ws, cmd):
     try:
-    #    print('Sending command: %s    ....' % cmd, end = '')
+        #print('Sending command: %s    ....' % cmd, end = '')
         ws.send(cmd)
-    #    print('sent')
+        #print('sent')
     except Exception as e:
         print('Failed to send command: %s' % (e))
         return
 
     try:
-    #    print('Listening for response....." , end = '')
+        #print('Listening for response.....' , end = '')
         wsResponse = ws.recv()
-    #    print("response recieved: %s" % wsResponse)
+        #print("response recieved: %s" % wsResponse)
     except Exception as e:
         print('Failed to receive: %s' % (e))
         return
@@ -171,14 +170,29 @@ def setZoneOnOff(ws, zoneName, zoneOnOff):
 
     return zoneOnOffResult
 
-def setZonePattern(ws, zoneName, patternName):
+def checkPatternName(ws, patternName):
+    # need to do checking of a patternName before sending. Sending bad name locks up system.
+    pass
 
-    zonePatternCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":'',"zoneName":["%s"]}}' % (patternName, zoneName)
+def setZonePattern(ws, zoneName, patternName):
+    # have to include  state un-quoted
+    zonePatternCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":1,"zoneName":["%s"]}}' % (patternName, zoneName)
+    #print('Zone command is: %s' % zonePatternCmd)
     zonePatternResult = json.loads(wsSendCommand(ws, zonePatternCmd))
+    print('Zone response is: %s' % zonePatternResult)
 
     return zonePatternResult
 
+def setAllZones(ws, zoneOnOffCmd, patternName):
+    # do something (on/off) or set pattern to all zones
+    pass
+
+
 def setZoneBrightness(ws, zoneName, zoneBrightnessLevel):
+    # have to get the current running pattern data
+    # replace the brightness field
+    # then send the pattern back
+
     zoneBrightnessCmd = '{"cmd":"toCtlrSet","runPattern":{"file":"%s","data":"","id":"","state":'',"zoneName":["%s"]}}' % (patternName, zoneName)
     zoneBrightnessResult = json.loads(wsSendCommand(ws, zoneBrightnessCmd))
 
@@ -201,13 +215,22 @@ def main(args):
         #patternFileList = testfunc(ws, keys)
         print(patternFileList)
 
-    elif "setZone" in sys.argv:
-        #print("Found setZone in arguments - attempting to control a zone.")
+    elif "setZoneOnOff" in sys.argv:
+        #print("Found setZoneOnOff in arguments - attempting to control a zone.")
+        ws = wsOpen(controllerURL, headers)
+        zoneName        = args.zoneName
+        zoneOnOff       = args.zoneOnOff
+        setZoneOnOff(ws, zoneName, zoneOnOff)
+
+    elif "setZonePattern" in sys.argv:
+        print("Found setZonePattern in arguments - attempting to control a zone.")
         ws = wsOpen(controllerURL, headers)
         zoneName        = args.zoneName
         patternName     = args.patternName
-        zoneOnOff       = args.zoneOnOff
-        setZoneOnOff(ws, zoneName, zoneOnOff)
+        setZonePatternResult = setZonePattern(ws, zoneName, patternName)
+        #print(setZonePatternResult)
+
+
     
     elif "getPatternFileData" in sys.argv:
         #print("Found getPatternFileData in arguments - attempting get details of a pattern file.")
@@ -219,10 +242,11 @@ def main(args):
         #print("Found getPatternFileData in arguments - attempting get details of a pattern file.")
         ws = wsOpen(controllerURL, headers)
         allPatternFileData     = getAllPatternFileData(ws)
-        
+
     else:
         print("NO COMMANDS FOUND - DOING NOTHING")
-    
+        sys.exit(1)
+
     wsClose(ws, controllerURL)
     sys.exit(0)
 
@@ -233,11 +257,14 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbose', type=bool, required=False, default=False, help='enable verbose logging')
 
     subparsers = parser.add_subparsers(title='COMMANDS', description='List of sub commands that can be run - each has thier own required options')
-    parser_setZone = subparsers.add_parser('setZone')
-    parser_setZone.add_argument('-z', '--zoneName', type=str, required=True, default=argparse.SUPPRESS, help='Name of Zone to control')
-    parser_setZone.add_argument('-o', '--zoneOnOff', type=str, required=False, default=argparse.SUPPRESS, help='turn Zone on (1) or off (0)')
-    parser_setZone.add_argument('-t', '--patternName', type=str, required=False, default='', help='name of the pattern (format: Folder/Pattern Name)') 
-    
+    parser_setZoneOnOff = subparsers.add_parser('setZoneOnOff')
+    parser_setZoneOnOff.add_argument('-z', '--zoneName', type=str, required=True, default=argparse.SUPPRESS, help='Name of Zone to control')
+    parser_setZoneOnOff.add_argument('-o', '--zoneOnOff', type=str, required=False, default=argparse.SUPPRESS, help='turn Zone on (1) or off (0)')
+
+    parser_setZonePattern = subparsers.add_parser('setZonePattern')
+    parser_setZonePattern.add_argument('-z', '--zoneName', type=str, required=True, default=argparse.SUPPRESS, help='Name of Zone to control')
+    parser_setZonePattern.add_argument('-t', '--patternName', type=str, required=False, default='', help='name of the pattern (format: Folder/Pattern Name)') 
+
     parser_getPatternFileData = subparsers.add_parser('getPatternFileData')
     parser_getPatternFileData.add_argument('-t', '--patternName', type=str, required=False, help='name of the pattern (format: Folder/Pattern Name)') 
 
